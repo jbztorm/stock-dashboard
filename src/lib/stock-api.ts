@@ -1,7 +1,44 @@
-// 股票数据源工具
+// 股票数据源工具 - 使用多个数据源
 
-// 新浪财经 API（A股）
-export async function fetchAStock(code: string) {
+// 尝试从腾讯财经获取A股数据（用于本地开发）
+async function fetchAStockFromTencent(code: string) {
+  const tsCode = code.startsWith('6') ? `sh${code}` : `sz${code}`;
+  const url = `https://qt.gtimg.cn/q=${tsCode}`;
+  
+  try {
+    const response = await fetch(url);
+    const text = await response.text();
+    
+    if (!text || text === 'null' || text.includes('v_')) {
+      return null;
+    }
+    
+    const match = text.match(/="([^"]+)"/);
+    if (!match) return null;
+    
+    const data = match[1].split('~');
+    
+    return {
+      code: data[2] || code,
+      name: decodeURIComponent(escape(data[1] || '')),
+      open: parseFloat(data[5]) || 0,
+      high: parseFloat(data[33]) || 0,
+      low: parseFloat(data[34]) || 0,
+      close: parseFloat(data[3]) || 0,
+      volume: parseInt(data[4]) || 0,
+      amount: parseFloat(data[37]) || 0,
+      change: parseFloat(data[31]) || 0,
+      changePercent: parseFloat(data[32]) || 0,
+      market: 'A股',
+      exchange: code.startsWith('6') ? 'SSE' : 'SZSE',
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+// 从新浪财经获取A股数据
+async function fetchAStockFromSina(code: string) {
   const sinaCode = code.startsWith('6') ? `sh${code}` : `sz${code}`;
   const url = `https://hq.sinajs.cn/list=${sinaCode}`;
   
@@ -14,19 +51,14 @@ export async function fetchAStock(code: string) {
     const text = await response.text();
     
     if (!text || text.includes('null') || text.length < 10) {
-      throw new Error('No data');
+      return null;
     }
     
     const match = text.match(/="([^"]+)"/);
-    if (!match || !match[1]) {
-      throw new Error('Parse error');
-    }
+    if (!match || !match[1]) return null;
     
     const data = match[1].split(',');
-    
-    if (!data[0]) {
-      throw new Error('Empty data');
-    }
+    if (!data[0]) return null;
     
     return {
       code: code,
@@ -43,32 +75,29 @@ export async function fetchAStock(code: string) {
       exchange: code.startsWith('6') ? 'SSE' : 'SZSE',
     };
   } catch (error) {
-    console.error(`Failed to fetch A stock ${code}:`, error);
     return null;
   }
 }
 
 // 港股数据源
-export async function fetchHKStock(code: string) {
+async function fetchHKStock(code: string) {
   const hkCode = code.startsWith('0') ? code : `0${code}`;
   const url = `https://hq.sinajs.cn/list=hk${hkCode}`;
   
   try {
     const response = await fetch(url, {
       headers: {
-        'Referer': 'https://',
+        'Referer': 'https://finance.sina.com.cn',
       }
-   finance.sina.com.cn });
+    });
     const text = await response.text();
     
     if (!text || text.includes('null') || text.length < 10) {
-      throw new Error('No data');
+      return null;
     }
     
     const match = text.match(/="([^"]+)"/);
-    if (!match || !match[1]) {
-      throw new Error('Parse error');
-    }
+    if (!match || !match[1]) return null;
     
     const data = match[1].split(',');
     
@@ -87,9 +116,22 @@ export async function fetchHKStock(code: string) {
       exchange: 'HKEX',
     };
   } catch (error) {
-    console.error(`Failed to fetch HK stock ${code}:`, error);
     return null;
   }
+}
+
+// A股 - 尝试多个数据源
+export async function fetchAStock(code: string) {
+  // 先尝试腾讯
+  let result = await fetchAStockFromTencent(code);
+  if (result) return result;
+  
+  // 再试新浪
+  result = await fetchAStockFromSina(code);
+  if (result) return result;
+  
+  // 都失败返回null
+  return null;
 }
 
 // Yahoo Finance（美股）
@@ -102,7 +144,7 @@ export async function fetchUSStock(symbol: string) {
     
     const result = json?.chart?.result?.[0];
     if (!result) {
-      throw new Error('No data');
+      return null;
     }
     
     const meta = result.meta;
@@ -122,13 +164,12 @@ export async function fetchUSStock(symbol: string) {
       exchange: meta.exchange || 'NASDAQ',
     };
   } catch (error) {
-    console.error(`Failed to fetch US stock ${symbol}:`, error);
     return null;
   }
 }
 
 // 获取美股历史数据
-export async function fetchUSStockHistory(symbol: string, days: number = 30) {
+export async function fetchUSStockHistory(symbol: string, days: number = 60) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=${days}d`;
   
   try {
@@ -152,9 +193,20 @@ export async function fetchUSStockHistory(symbol: string, days: number = 30) {
       volume: quote.volume?.[i] || 0,
     }));
   } catch (error) {
-    console.error(`Failed to fetch US stock history ${symbol}:`, error);
     return [];
   }
+}
+
+// 港股历史数据
+async function fetchHKStockHistory(code: string, days: number = 60) {
+  // 港股暂不支持历史数据
+  return [];
+}
+
+// A股历史数据
+async function fetchAStockHistory(code: string, days: number = 60) {
+  // A股暂不支持历史数据（Vercel无法访问国内API）
+  return [];
 }
 
 // 统一接口
@@ -168,10 +220,11 @@ export async function fetchStock(code: string, market: string) {
   }
 }
 
-export async function fetchStockHistory(code: string, market: string, days: number = 30) {
-  if (market === 'A股' || market === '港股') {
-    // 暂时返回空数组，历史数据需要另外处理
-    return [];
+export async function fetchStockHistory(code: string, market: string, days: number = 60) {
+  if (market === 'A股') {
+    return fetchAStockHistory(code, days);
+  } else if (market === '港股') {
+    return fetchHKStockHistory(code, days);
   } else {
     return fetchUSStockHistory(code, days);
   }
