@@ -114,11 +114,21 @@ export default function Dashboard() {
   };
 
   const handleDeleteStock = async (id: string) => {
+    console.log('Deleting stock:', id);
     try {
       const res = await fetch(`/api/stocks?id=${id}`, { method: 'DELETE' });
       const json = await res.json();
+      console.log('Delete result:', json);
       if (json.success) {
-        loadStocks();
+        // 直接从前端状态中移除
+        setStocks(stocks.filter(s => s.id !== id));
+        // 同时删除对应的行情数据
+        const stockToDelete = stocks.find(s => s.id === id);
+        if (stockToDelete) {
+          const newQuotes = { ...quotes };
+          delete newQuotes[stockToDelete.code];
+          setQuotes(newQuotes);
+        }
       }
     } catch (error) {
       console.error('Failed to delete stock:', error);
