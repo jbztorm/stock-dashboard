@@ -65,10 +65,10 @@ export default function StockCard({ stock, quote, onDelete }: StockCardProps) {
         </div>
         <button
           onClick={handleDelete}
-          className="text-gray-500 hover:text-red-400 transition-colors"
+          className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-gray-700 rounded transition-colors text-lg"
           title="删除"
         >
-          ✕
+          ×
         </button>
       </div>
 
