@@ -67,7 +67,14 @@ export default function StockCard({ stock, quote, onDelete }: StockCardProps) {
         </div>
         <button
           type="button"
-          onClick={handleDelete}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onClick={() => {
+            console.log('Delete button clicked', stock.id);
+            onDelete();
+          }}
           className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-gray-700 rounded transition-colors text-lg"
           title="删除"
         >
