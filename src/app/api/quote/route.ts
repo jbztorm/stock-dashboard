@@ -6,7 +6,7 @@ import { fetchStock, fetchStockHistory } from '@/lib/stock-api';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { codes, market } = body;
+    const { codes, markets } = body;
 
     if (!codes || !Array.isArray(codes) || codes.length === 0) {
       return NextResponse.json(
@@ -16,8 +16,8 @@ export async function POST(request: Request) {
     }
 
     const results = await Promise.all(
-      codes.map(async (code: string) => {
-        const stockMarket = market || '美股';
+      codes.map(async (code: string, index: number) => {
+        const stockMarket = markets?.[index] || '美股';
         const quote = await fetchStock(code, stockMarket);
         return { code, market: stockMarket, quote };
       })
