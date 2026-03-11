@@ -1,44 +1,44 @@
 // 股票数据源工具
 
-// 腾讯财经 API（A股）
+// 新浪财经 API（A股）
 export async function fetchAStock(code: string) {
-  const tsCode = code.startsWith('6') || code.startsWith('0') 
-    ? (code.startsWith('6') ? `sh${code}` : `sz${code}`)
-    : code;
-  
-  const url = `https://qt.gtimg.cn/q=${tsCode}`;
+  const sinaCode = code.startsWith('6') ? `sh${code}` : `sz${code}`;
+  const url = `https://hq.sinajs.cn/list=${sinaCode}`;
   
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: {
+        'Referer': 'https://finance.sina.com.cn',
+      }
+    });
     const text = await response.text();
     
-    if (!text || text === 'null') {
+    if (!text || text.includes('null') || text.length < 10) {
       throw new Error('No data');
     }
     
-    // 解析格式: v_sh600519="1~贵州茅台~600519~1399.97~..."
     const match = text.match(/="([^"]+)"/);
-    if (!match) {
+    if (!match || !match[1]) {
       throw new Error('Parse error');
     }
     
-    const data = match[1].split('~');
+    const data = match[1].split(',');
     
-    // 腾讯财经数据字段索引
-    // 0: 市场代号, 1: 名称, 2: 代码, 3: 当前价, 4: 涨跌, 5: 涨跌幅
-    // ...更多字段
+    if (!data[0]) {
+      throw new Error('Empty data');
+    }
     
     return {
-      code: data[2] || code,
-      name: decodeURIComponent(escape(data[1] || '')),
-      open: parseFloat(data[5]) || 0,
-      high: parseFloat(data[33]) || 0,
-      low: parseFloat(data[34]) || 0,
-      close: parseFloat(data[3]) || 0,
-      volume: parseInt(data[4]) || 0,
-      amount: parseFloat(data[37]) || 0,
-      change: parseFloat(data[31]) || 0,
-      changePercent: parseFloat(data[32]) || 0,
+      code: code,
+      name: data[0],
+      open: parseFloat(data[1]) || 0,
+      high: parseFloat(data[2]) || 0,
+      low: parseFloat(data[3]) || 0,
+      close: parseFloat(data[4]) || 0,
+      volume: parseInt(data[5]) || 0,
+      amount: parseFloat(data[6]) || 0,
+      change: parseFloat(data[7]) || 0,
+      changePercent: parseFloat(data[8]) || 0,
       market: 'A股',
       exchange: code.startsWith('6') ? 'SSE' : 'SZSE',
     };
@@ -48,34 +48,47 @@ export async function fetchAStock(code: string) {
   }
 }
 
-// 获取A股历史数据
-export async function fetchAStockHistory(code: string, days: number = 30) {
-  const tsCode = code.startsWith('6') ? `sh${code}` : `sz${code}`;
-  const url = `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${tsCode},day,,${days},qfq`;
+// 港股数据源
+export async function fetchHKStock(code: string) {
+  const hkCode = code.startsWith('0') ? code : `0${code}`;
+  const url = `https://hq.sinajs.cn/list=hk${hkCode}`;
   
   try {
-    const response = await fetch(url);
-    const json = await response.json();
+    const response = await fetch(url, {
+      headers: {
+        'Referer': 'https://',
+      }
+   finance.sina.com.cn });
+    const text = await response.text();
     
-    const stockData = json?.data?.[tsCode];
-    if (!stockData) return [];
-    
-    const data = stockData?.data?.qfq || stockData?.data?.day;
-    if (!data || !data.day) {
-      return [];
+    if (!text || text.includes('null') || text.length < 10) {
+      throw new Error('No data');
     }
     
-    return data.day.map((item: string[]) => ({
-      date: item[0],
-      open: parseFloat(item[1]),
-      high: parseFloat(item[2]),
-      low: parseFloat(item[3]),
-      close: parseFloat(item[4]),
-      volume: parseInt(item[5]) || 0,
-    }));
+    const match = text.match(/="([^"]+)"/);
+    if (!match || !match[1]) {
+      throw new Error('Parse error');
+    }
+    
+    const data = match[1].split(',');
+    
+    return {
+      code: code,
+      name: data[1] || '',
+      open: parseFloat(data[2]) || 0,
+      high: parseFloat(data[3]) || 0,
+      low: parseFloat(data[4]) || 0,
+      close: parseFloat(data[5]) || 0,
+      volume: parseInt(data[6]) || 0,
+      amount: parseFloat(data[7]) || 0,
+      change: parseFloat(data[8]) || 0,
+      changePercent: parseFloat(data[9]) || 0,
+      market: '港股',
+      exchange: 'HKEX',
+    };
   } catch (error) {
-    console.error(`Failed to fetch A stock history ${code}:`, error);
-    return [];
+    console.error(`Failed to fetch HK stock ${code}:`, error);
+    return null;
   }
 }
 
@@ -93,7 +106,6 @@ export async function fetchUSStock(symbol: string) {
     }
     
     const meta = result.meta;
-    const quote = result.indicators?.quote?.[0];
     
     return {
       code: symbol,
@@ -147,8 +159,10 @@ export async function fetchUSStockHistory(symbol: string, days: number = 30) {
 
 // 统一接口
 export async function fetchStock(code: string, market: string) {
-  if (market === 'A股' || market === '港股') {
+  if (market === 'A股') {
     return fetchAStock(code);
+  } else if (market === '港股') {
+    return fetchHKStock(code);
   } else {
     return fetchUSStock(code);
   }
@@ -156,7 +170,8 @@ export async function fetchStock(code: string, market: string) {
 
 export async function fetchStockHistory(code: string, market: string, days: number = 30) {
   if (market === 'A股' || market === '港股') {
-    return fetchAStockHistory(code, days);
+    // 暂时返回空数组，历史数据需要另外处理
+    return [];
   } else {
     return fetchUSStockHistory(code, days);
   }
