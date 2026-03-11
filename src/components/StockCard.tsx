@@ -51,10 +51,9 @@ export default function StockCard({ stock, quote, onDelete }: StockCardProps) {
     }
   }, [showKline, stock.code, stock.market]);
 
-  const handleDelete = async () => {
-    if (confirm(`确定删除 ${stock.name} (${stock.code}) 吗？`)) {
-      onDelete();
-    }
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete();
   };
 
   return (
@@ -168,7 +167,7 @@ function KlineChart({ data, loading }: { data: any[]; loading: boolean }) {
           </tr>
         </thead>
         <tbody>
-          {displayData.slice(-10).reverse().map((item: any, i: number) => (
+          {displayData.reverse().map((item: any, i: number) => (
             <tr key={i} className="text-gray-300">
               <td className="py-1">{item.date}</td>
               <td className="text-right">{item.open?.toFixed(2)}</td>
