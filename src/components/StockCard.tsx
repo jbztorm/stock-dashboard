@@ -52,7 +52,9 @@ export default function StockCard({ stock, quote, onDelete }: StockCardProps) {
   }, [showKline, stock.code, stock.market]);
 
   const handleDelete = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
+    console.log('Delete clicked for', stock.id);
     onDelete();
   };
 
@@ -64,6 +66,7 @@ export default function StockCard({ stock, quote, onDelete }: StockCardProps) {
           <p className="text-sm text-gray-400">{stock.code} · {stock.market}</p>
         </div>
         <button
+          type="button"
           onClick={handleDelete}
           className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-gray-700 rounded transition-colors text-lg"
           title="删除"
